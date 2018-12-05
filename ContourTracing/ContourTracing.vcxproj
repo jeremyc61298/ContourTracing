@@ -139,6 +139,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="contour.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="contour.ans" />
+    <None Include="contour.in" />
+    <None Include="contour.out" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
