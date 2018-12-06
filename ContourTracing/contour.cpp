@@ -38,6 +38,7 @@ struct point {
 // 5 pixels. It does this using the Moore boundry tracking algorithm
 class ContourTracer {
 	int rows, cols;
+	const int SMALLEST_OBJECT = 5;
 	vector<string> bitmap;
 	vector<int> objectSizes;
 
@@ -46,6 +47,7 @@ class ContourTracer {
 
 	// Methods
 	void trace(point b0);
+	void testPoint(point curr, point prev);
 	vector<point> initializeNeighbors(point current, point previous);
 	void skipPoints(int& i, int& j);
 
@@ -102,11 +104,41 @@ void ContourTracer::traceContours() {
 
 void ContourTracer::trace(point b0) {
 	point c0(b0.x, b0.y - 1);
+	point cN, bN;	
 	vector<point> neighbors = initializeNeighbors(b0, c0);
+	bool fullTrace = false;
+	int i, objectSize = 0;
+
+	for (i = 0; i < neighbors.size() && !fullTrace; i++) {
+		// Test each neighboring point to see if it's a 1
+		point curr = neighbors[i];
+		if (bitmap[curr.x][curr.y] == '1') {
+			// Add the location to the set
+			markedPoints.insert(curr.str());
+			bN = curr;
+			cN = neighbors[i - 1];
+			if (bN != b0 && cN != c0) {
+				// Add one to the object size and reset the loop
+				objectSize++;
+				neighbors = initializeNeighbors(bN, cN);
+				i = 1;
+			}
+			else {
+				// Back to where it started, object has been traced. 
+				fullTrace = true;
+			}
+		}
+	}
+
+	if (objectSize >= SMALLEST_OBJECT) {
+		objectSizes.push_back(objectSize);
+	}
+}
+
+void ContourTracer::testPoint(point curr, point prev) {
 
 }
 
-// Maybe I should use a stack instead?
 vector<point> ContourTracer::initializeNeighbors(point cur, point prev) {
 	// Find all eight surrounding directions starting with the previous point
 	vector<point> neighbors;
