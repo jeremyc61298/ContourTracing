@@ -47,7 +47,8 @@ class ContourTracer {
 
 	// Methods
 	void trace(point b0);
-	void testPoint(point curr, point prev);
+	void moveToNextPoint();
+	bool marked(string pointToCheck);
 	vector<point> initializeNeighbors(point current, point previous);
 	void skipPoints(int& i, int& j);
 
@@ -89,7 +90,7 @@ void ContourTracer::traceContours() {
 		for (int j = 1; j < cols - 1; j++) {
 			if (bitmap[i][j] == '1') {
 				point current(i, j);
-				if (markedPoints.find(current.str()) == markedPoints.end()) {
+				if (!marked(current.str())) {
 					// A new object has been found
 					trace(current);
 				}
@@ -104,28 +105,35 @@ void ContourTracer::traceContours() {
 
 void ContourTracer::trace(point b0) {
 	point c0(b0.x, b0.y - 1);
-	point cN, bN;	
+	point cN, b1, bN(0, 0);	
 	vector<point> neighbors = initializeNeighbors(b0, c0);
-	bool fullTrace = false;
+	bool secondPoint = false, fullTrace = false;
 	int i, objectSize = 0;
 
-	for (i = 0; i < neighbors.size() && !fullTrace; i++) {
+	for (i = 1; i < neighbors.size() && !fullTrace; i++) {
 		// Test each neighboring point to see if it's a 1
 		point curr = neighbors[i];
 		if (bitmap[curr.x][curr.y] == '1') {
 			// Add the location to the set
 			markedPoints.insert(curr.str());
-			bN = curr;
-			cN = neighbors[i - 1];
-			if (bN != b0 && cN != c0) {
-				// Add one to the object size and reset the loop
-				objectSize++;
-				neighbors = initializeNeighbors(bN, cN);
-				i = 1;
+			if (secondPoint == false) {
+				secondPoint = true;
+				b1 = curr;
 			}
 			else {
-				// Back to where it started, object has been traced. 
-				fullTrace = true;
+				if (curr != b1 && bN != b0) {
+					bN = curr;
+					cN = neighbors[i - 1];
+					if (!marked(bN.str())) {
+						objectSize++;
+					}
+					neighbors = initializeNeighbors(bN, cN);
+					i = 1;
+				}
+				else {
+					// Back to where it started, object has been traced. 
+					fullTrace = true;
+				}
 			}
 		}
 	}
@@ -135,8 +143,8 @@ void ContourTracer::trace(point b0) {
 	}
 }
 
-void ContourTracer::testPoint(point curr, point prev) {
-
+bool ContourTracer::marked(string pointToCheck) {
+	return markedPoints.find(pointToCheck) != markedPoints.end();
 }
 
 vector<point> ContourTracer::initializeNeighbors(point cur, point prev) {
@@ -212,6 +220,7 @@ int main() {
 		moreCases = ct.inputBitmap(fin);
 		if (moreCases)
 			fout << endl;
+		caseNumber++;
 	}
 
 }
