@@ -10,6 +10,7 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <set>
 using std::cout;
 using std::cerr;
 using std::endl;
@@ -17,10 +18,17 @@ using std::ifstream;
 using std::ofstream;
 using std::vector;
 using std::string;
+using std::set;
 
 struct point {
 	point() : x(0), y(0) {} 
 	point(int x, int y) : x(x), y(y) {}
+	string str() {
+		return x + " " + y;
+	}
+
+	bool operator==(const point& p) { return (this->x == p.x && this->y == p.y); }
+	bool operator!=(const point& p) { return (this->x != p.x || this->y != p.y); }
 
 	int x, y;
 };
@@ -32,6 +40,14 @@ class ContourTracer {
 	int rows, cols;
 	vector<string> bitmap;
 	vector<int> objectSizes;
+
+	// Points are stored in string form
+	set<string> markedPoints;
+
+	// Methods
+	void trace(point b0);
+	vector<point> initializeNeighbors(point current, point previous);
+	void skipPoints(int& i, int& j);
 
 public:
 	ContourTracer() = default;
@@ -56,13 +72,67 @@ bool ContourTracer::inputBitmap(ifstream& fin) {
 			getline(fin, line);
 			bitmap.push_back(line);
 		}
+		
+		// Clean the reusable data structures
+		objectSizes.clear();
+		markedPoints.clear();
 		moreCases = true;
 	}
 	return moreCases;
 }
 
 void ContourTracer::traceContours() {
+	// Scan the bitmap for a 1 whose location is not in the markedPoints set
+	for (int i = 1; i < rows - 1; i++) {
+		for (int j = 1; j < cols - 1; j++) {
+			if (bitmap[i][j] == '1') {
+				point current(i, j);
+				if (markedPoints.find(current.str()) == markedPoints.end()) {
+					// A new object has been found
+					trace(current);
+				}
+				else {
+					// Already traced this object, needs to be "skipped"
+					skipPoints(i, j);
+				}
+			}
+		}
+	}
+}
 
+void ContourTracer::trace(point b0) {
+	point c0(b0.x, b0.y - 1);
+	vector<point> neighbors = initializeNeighbors(b0, c0);
+
+}
+
+// Maybe I should use a stack instead?
+vector<point> ContourTracer::initializeNeighbors(point cur, point prev) {
+	// Find all eight surrounding directions starting with the previous point
+	vector<point> neighbors;
+	neighbors.emplace_back(cur.x - 1, cur.y);
+	neighbors.emplace_back(cur.x - 1, cur.y + 1);
+	neighbors.emplace_back(cur.x, cur.y + 1);
+	neighbors.emplace_back(cur.x + 1, cur.y + 1);
+	neighbors.emplace_back(cur.x + 1, cur.y);
+	neighbors.emplace_back(cur.x + 1, cur.y - 1);
+	neighbors.emplace_back(cur.x, cur.y - 1);
+	neighbors.emplace_back(cur.x - 1, cur.y - 1);
+
+	auto vt = neighbors.begin();
+	while (*vt != prev) {
+		vt++;
+	}
+	vector<point> vp(vt, neighbors.end());
+	vp.insert(vp.end(), neighbors.begin(), vt);
+	return vp;
+}
+
+void ContourTracer::skipPoints(int& i, int& j) {
+	// Advance i and j until at a location that does not have a 1
+	for (; (i < rows - 1) && bitmap[i][j] == 1; i++)
+		for (; (j < cols - 1) && bitmap[i][j] == 1; j++)
+		{}
 }
 
 void ContourTracer::printSizes(ofstream& fout) {
@@ -103,8 +173,7 @@ int main() {
 	bool moreCases = ct.inputBitmap(fin);
 	
 	while (moreCases) {
-		// Find the contours
-		// Print out the case
+		ct.traceContours();
 		fout << "Case " << caseNumber << endl;
 		ct.printSizes(fout);
 
