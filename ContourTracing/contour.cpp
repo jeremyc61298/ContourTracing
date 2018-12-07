@@ -10,7 +10,9 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#include <set>
+#include <unordered_set>
+#include <algorithm>
+#include <sstream>
 using std::cout;
 using std::cerr;
 using std::endl;
@@ -18,13 +20,21 @@ using std::ifstream;
 using std::ofstream;
 using std::vector;
 using std::string;
-using std::set;
+using std::to_string;
+using std::unordered_set;
+using std::sort;
+using std::stringstream;
 
 struct point {
 	point() : x(0), y(0) {} 
 	point(int x, int y) : x(x), y(y) {}
+	explicit point(string p) {
+		stringstream ss(p);
+		ss >> x >> y;
+	}
+
 	string str() {
-		return x + " " + y;
+		return to_string(x) + " " + to_string(y);
 	}
 
 	bool operator==(const point& p) { return (this->x == p.x && this->y == p.y); }
@@ -43,14 +53,14 @@ class ContourTracer {
 	vector<int> objectSizes;
 
 	// Points are stored in string form
-	set<string> markedPoints;
+	unordered_set<string> markedPoints;
 
 	// Methods
 	void trace(point b0);
-	void moveToNextPoint();
-	bool marked(string pointToCheck);
+	bool marked(const unordered_set<string>& s, string pointToCheck);
 	vector<point> initializeNeighbors(point current, point previous);
 	void skipPoints(int& i, int& j);
+	void addNewSize(unordered_set<string>& uniquePoints, int objectSize);
 
 public:
 	ContourTracer() = default;
@@ -65,6 +75,7 @@ public:
 bool ContourTracer::inputBitmap(ifstream& fin) {
 	bool moreCases = false;
 	fin >> rows >> cols;
+	bitmap.clear();
 
 	if (rows != 0 && cols != 0) {
 		// Trash the endline
@@ -90,7 +101,7 @@ void ContourTracer::traceContours() {
 		for (int j = 1; j < cols - 1; j++) {
 			if (bitmap[i][j] == '1') {
 				point current(i, j);
-				if (!marked(current.str())) {
+				if (!marked(markedPoints, current.str())) {
 					// A new object has been found
 					trace(current);
 				}
@@ -106,6 +117,7 @@ void ContourTracer::traceContours() {
 void ContourTracer::trace(point b0) {
 	point c0(b0.x, b0.y - 1);
 	point cN, b1, bN(0, 0);	
+	unordered_set<string> uniquePoints;
 	vector<point> neighbors = initializeNeighbors(b0, c0);
 	bool secondPoint = false, fullTrace = false;
 	int i, objectSize = 0;
@@ -114,37 +126,52 @@ void ContourTracer::trace(point b0) {
 		// Test each neighboring point to see if it's a 1
 		point curr = neighbors[i];
 		if (bitmap[curr.x][curr.y] == '1') {
-			// Add the location to the set
-			markedPoints.insert(curr.str());
-			if (secondPoint == false) {
-				secondPoint = true;
-				b1 = curr;
+			if (curr != b1 || bN != b0) {
+				if (!secondPoint) {
+					secondPoint = true;
+					b1 = curr;
+				}
+				bN = curr;
+				cN = neighbors[i - 1];
+				objectSize++;
+				markedPoints.insert(bN.str());
+				uniquePoints.insert(bN.str());
+				neighbors = initializeNeighbors(bN, cN);
+				i = 0 ;
 			}
 			else {
-				if (curr != b1 && bN != b0) {
-					bN = curr;
-					cN = neighbors[i - 1];
-					if (!marked(bN.str())) {
-						objectSize++;
-					}
-					neighbors = initializeNeighbors(bN, cN);
-					i = 1;
-				}
-				else {
-					// Back to where it started, object has been traced. 
-					fullTrace = true;
+				// Back to where it started, object has been traced. 
+				fullTrace = true;
+			}
+		}
+	}
+	
+	addNewSize(uniquePoints, objectSize);
+}
+
+void ContourTracer::addNewSize(unordered_set<string>& uniquePoints, int objectSize) {
+	if (uniquePoints.size() <= SMALLEST_OBJECT) {
+		for (string s : uniquePoints) {
+			point curr(s);
+			point prev(curr.x, curr.y - 1);
+			vector<point> neighbors = initializeNeighbors(curr, prev);
+			for (int i = 0; i < neighbors.size(); i++) {
+				// check to see if there are any other points in the object
+				point p = neighbors[i];
+				if (bitmap[p.x][p.y] == '1' && !marked(uniquePoints, p.str())) {
+					uniquePoints.insert(p.str());
 				}
 			}
 		}
 	}
-
-	if (objectSize >= SMALLEST_OBJECT) {
+	
+	if (uniquePoints.size() >= SMALLEST_OBJECT) {
 		objectSizes.push_back(objectSize);
 	}
 }
 
-bool ContourTracer::marked(string pointToCheck) {
-	return markedPoints.find(pointToCheck) != markedPoints.end();
+bool ContourTracer::marked(const unordered_set<string>& s, string pointToCheck) {
+	return s.find(pointToCheck) != s.end();
 }
 
 vector<point> ContourTracer::initializeNeighbors(point cur, point prev) {
@@ -170,19 +197,26 @@ vector<point> ContourTracer::initializeNeighbors(point cur, point prev) {
 
 void ContourTracer::skipPoints(int& i, int& j) {
 	// Advance i and j until at a location that does not have a 1
-	for (; (i < rows - 1) && bitmap[i][j] == 1; i++)
-		for (; (j < cols - 1) && bitmap[i][j] == 1; j++)
-		{}
+	while (i < rows - 1 && bitmap[i][j] == '1') {
+		while (j < cols - 1 && bitmap[i][j] == '1') {
+			//if (bitmap[i][j] == '1')
+				++j;
+		}
+		if (bitmap[i][j] == '1')
+			++i;
+	}
 }
+
 
 void ContourTracer::printSizes(ofstream& fout) {
 	int numObjectsFound = objectSizes.size();
 	if (numObjectsFound == 0) {
-		fout << "No objects found" << endl;
+		fout << "No objects found";
 	}
 	else {
+		sort(objectSizes.begin(), objectSizes.end());
 		for (int i = 0; i < numObjectsFound; i++) {
-			fout << i;
+			fout << objectSizes[i];
 			if (i != numObjectsFound - 1)
 				fout << " ";
 		}
